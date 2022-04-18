@@ -32,13 +32,13 @@ int lineThreshold = 800;
 
 // Define state variable and initialize inputs
 int state = S0;
-int start_state = 0;
-int color_state = 0;
-int game_state = 0;
-int redpin = 31;
-int bluepin = 32;
-int yellowpin = 33;
-int startpin = 34;
+int start_state = 0;    // set to zero at starting
+int color_state = 0;    // set to zero at starting
+int game_state = 0;     // set to zero at starting
+int redpin = 31;        // pin for red led
+int bluepin = 32;       // pin for blue led
+int yellowpin = 33;     // pin for yellow led
+int startpin = 34;      // pin for game mode led
 int red_color = 0;          // Mole location square color: 0 = off, 1 = on
 int yellow_color = 0;        // Mole location square color: 0 = off, 1 = on
 int blue_color = 0;         // Mole location square color: 0 = off, 1 = on
