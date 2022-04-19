@@ -68,10 +68,9 @@ void setup() {
   Serial.begin(9600);
   pinMode(usTrigPin,OUTPUT);
   pinMode(usEchoPin,INPUT);
-  pinMode(col_button1, INPUT_PULLDOWN);
-  pinMode(col_button2, INPUT_PULLDOWN);
-  pinMode(col_button3, INPUT_PULLDOWN);
-  pinMode(col_button4, INPUT_PULLDOWN);
+  pinMode(col_button1, INPUT_PULLUP);
+  pinMode(col_button2, INPUT_PULLUP);
+  pinMode(col_button3, INPUT_PULLUP);
   pinMode(redpin, OUTPUT);
   pinMode(bluepin, OUTPUT);
   pinMode(yellowpin, OUTPUT);
@@ -153,15 +152,15 @@ void loop() {
           start_state = 1;
           digitalWrite(startpin, HIGH);
           }
-        else {
+        else{
           digitalWrite(startpin, LOW);
           start_state = 0;
           state = S1;
           }
-        }
         game_state = game_mode;
         delay(500);
-      else{
+        }
+   else{
           digitalWrite(startpin, LOW);
           state = S1;
         }
