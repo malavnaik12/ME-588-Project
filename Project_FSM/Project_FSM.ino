@@ -1,5 +1,6 @@
 // Project_FSM.ino - Modified by Malav Naik on Mar 22, 2022
 // modified by Harsh Pathak on April 17, 18, 2022
+// States 0 and 1 complete
 
 // Set flag for displaying the current safe status
 const boolean VERBOSE = true;
