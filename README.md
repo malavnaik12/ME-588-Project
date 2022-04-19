@@ -1,7 +1,7 @@
 # ME-588-Project
 ME 588 Project Code Files
 
-If you are committing a new file, please title the commit as "Project FSM v#" (without the quotation marks) where # is the corresponding number we are at and be as descriptive as possible within the commit description. 
+If you are committing an edit, please title the commit as "Project FSM v#" (without the quotation marks) where # is the corresponding number we are at and be as descriptive as possible within the commit description. 
 
 Please read the description to ensure that you are using the correct and most recent FSM file.
 
