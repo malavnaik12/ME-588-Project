@@ -1,5 +1,3 @@
-// This is a test line
-
 // Project_FSM.ino - Modified by Malav Naik on Mar 22, 2022
 // modified by Harsh Pathak on April 17, 18, 2022
 
