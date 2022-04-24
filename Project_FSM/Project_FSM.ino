@@ -55,6 +55,8 @@ int color_sensor = 0;       // Simulated color sensor input: 0 = not target mole
 int ultrasonic_sensor = 0;  // Simulated ultrasonic sensor input: 0 = arena boundary not detected, 1 = arena boundary detected
 int encoder = 0;            // Simulated input to execute robot turn: 0 = robot not commanded to turn, 1 = robot commanded to turn
 int drop_count = 0;         // Counter to keep track of number of dropped mole whackers, counts by +1 for each successful drop, up-to 5
+int lineFound = 0;          // Binary variable characterizing the instance of finding black line
+int intersectCount = 0;     // Variable characterizing intersection of black lines
 
 // Sensor read variable initializations
   // Ultrasonic Sensor
@@ -78,7 +80,16 @@ int encPos_left = 0; int encPos_right = 0;
 const uint8_t SX1509_ADDRESS = 0x3E;  // SX1509 I2C address (00), for Line Sensor Array
 SensorBar mySensorBar(SX1509_ADDRESS);
 
-// serial_input is used to give encoder input from the serial monitor.  
+// Robot action IDs
+int actionID;
+const int FIND_LINE = 0;
+const int READ_LINE = 1;
+const int GO_FORWARD = 2;
+const int CORRECT_LEFT = 3;
+const int CORRECT_RIGHT = 4;
+const int TURN_LEFT = 5;
+const int TURN_RIGHT = 6;
+const int STOP = 7;
 char serial_input = ' ';
 
 void setup() {
@@ -93,6 +104,7 @@ void setup() {
   pinMode(bluepin, OUTPUT);
   pinMode(yellowpin, OUTPUT);
   pinMode(start_button, INPUT_PULLUP);
+  
   pinMode(IN1, OUTPUT);
   pinMode(IN2, OUTPUT);
   pinMode(ENA_left, OUTPUT);
@@ -118,10 +130,11 @@ void loop() {
   //  Serial.print("Left Encoder Position: "); Serial.println(encPos_left);
   //  Serial.print("Right Encoder Position: "); Serial.println(encPos_right);
   
-    // Motor inputs
-  int trimIn = 0.05;
-  int driveIn = 50;
-  int correctIn = 0.2;
+  // Motor inputs
+  int trimIn = 0.05;    // Fraction of trim (between 0 and 1) used in line following
+  int driveIn = 50;     // Motor speed, PWM input
+  int driveDir = 1;     // Motor rotation direction, 1 for forward and -1 for backward
+  int correctIn = 0.2;  // Fraction of motor speed, used in line following
     
   // 2. Robot FSM
   switch(state) {
@@ -162,25 +175,23 @@ void loop() {
         }
       break;
     case S2:  // Robot driving to pick up black line
-//      int leftLS = readLineSensor(leftLS_pin);
-//      int middleLS = readLineSensor(middleLS_pin);
-//      int rightLS = readLineSensor(rightLS_pin);
-      //Serial.println("In S2: Robot Driving, awaiting Input for black line detection from Line Sensor");
-      if (transition3 == 0) {
-//        if ((leftLS > lineThreshold)&&(middleLS > lineThreshold)&&(rightLS > lineThreshold)) {
-          //digitalWrite(6,1);
-          // EXECUTE TURN AND BEGIN LINE FOLLOWING
-          nextState = S3; transition3 = 1;
-        } else {
-          //line_sensor = 0; encoder = 1;
-          // ROBOT CONTINUES DRIVING FORWARD, AWAITING BLACK LINE DETECTION
-          nextState = S2; transition3 = 0;
-        }
-      if (transition3 == 1) {
-        Serial.println("Black line detected, robot executes left hand turn and now following black line");
-        encoder = 0;
-        //digitalWrite(6,0);
+      if (lineFound == 0) {
+        driveBot(driveIn,1,ENA_left,IN1,IN2);
+        driveBot(driveIn,1,ENA_right,IN3,IN4);
+        lineFound = 1;
+        nextState = S2;
       }
+      if(mySensorBar.getDensity() > 3 ) { 
+        driveBot(0,0,ENA_left,IN1,IN2);
+        driveBot(0,0,ENA_right,IN3,IN4);
+        actionID = STOP;
+        robotActions_S2S3(actionID,driveIn);
+      }
+      if (lineFound == 1) {
+        actionID = TURN_LEFT;
+        robotActions_S2S3(actionID,driveIn);
+      }
+      nextState = S3;
       break;
     case S3:  // Robot line following
       //digitalWrite(5,1);
@@ -264,4 +275,46 @@ void loop() {
       break;
   }
   state = nextState;
+}
+
+void robotActions_S2S3(int actionIDs,int driveIn) {
+  int nextAction;
+  switch (actionIDs) {
+    case STOP:
+      driveBot(0,0,ENA_left,IN1,IN2);
+      driveBot(0,0,ENA_right,IN3,IN4);
+      Serial.println("Executing STOP action");
+      break;
+    case TURN_LEFT:
+      driveBot((driveIn-driveIn)+5,-1,ENA_left,IN1,IN2);
+      driveBot(driveIn,1,ENA_right,IN3,IN4);
+      break;
+  }
+}
+
+
+void driveBot(int driveInput,int driveDir,int pinEN,int pinIN_1,int pinIN_2) {
+  analogWrite(pinEN,driveInput);
+  if (driveDir == 1) {
+    digitalWrite(pinIN_1, HIGH);
+    digitalWrite(pinIN_2, LOW);
+  } else if (driveDir == -1) {
+    digitalWrite(pinIN_1, LOW);
+    digitalWrite(pinIN_2, HIGH); 
+  } else {
+    digitalWrite(pinIN_1, LOW);
+    digitalWrite(pinIN_2, LOW); 
+  } 
+}
+
+void turnBot(float turnInput,float trimInput,int pinEN,int pinIN_1,int pinIN_2) {
+  int driveOut;
+  if(turnInput > 0 ) {
+    driveOut = 255*(turnInput);
+  } else {
+    driveOut = 255*((-1*turnInput) + trimInput);
+  }
+  analogWrite(pinEN,driveOut);
+  digitalWrite(pinIN_1, HIGH);
+  digitalWrite(pinIN_2, LOW);
 }
