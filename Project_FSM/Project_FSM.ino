@@ -18,25 +18,17 @@ const int S4 = 4;
 const int S5 = 5;
 const int S6 = 6;
 
-//FSM transition variables definitions
-int transition1 = 0;
-int transition2 = 0;
-int transition3 = 0;
-int transition4 = 0;
-int transition5 = 0;
-int transition6 = 0;
-
 // Variable definitions and initialize inputs
 int color_state = 0;    // set to zero at starting
 int game_state = 0;     // set to zero at starting
 int redpin = 23;        // pin for red led
 int bluepin = 25;       // pin for blue led
 int yellowpin = 27;     // pin for yellow led
-int startpin = 29;      // pin for game mode led
+int startpin = 49;      // pin for game mode led
 int col_button1 = 22;   // digital output corresponding to pushbutton 1
 int col_button2 = 26;   // digital output corresponding to pushbutton 2
 int col_button3 = 24;   // digital output corresponding to pushbutton 3
-int start_button = 30;  // digital output corresponding to start the game
+int start_button = 47;  // digital output corresponding to start the game
 int timeLimitPin = 39;  // digital output corresponding to exceeded time limit
 
 int red_color = 0;          // Mole location square color: 0 = off, 1 = on
@@ -52,6 +44,7 @@ int intersectCount = 0;     // Variable characterizing intersection of black lin
 float startTime = 0;        // Variable used to denote the beginning of the game
 float currentTime = 0;      // Time variable
 int timeLimit = 0;          // Characterizes if the 2-minute time limit is exceeded
+int targetColor = 0;        // Integer characterizes the target color: 1 = red, 2 = yellow, 3 = blue
 
 // Sensor read variable initializations and pin definitions
   // Ultrasonic Sensor
@@ -97,10 +90,11 @@ void setup() {
   pinMode(col_button1, INPUT_PULLUP);
   pinMode(col_button2, INPUT_PULLUP);
   pinMode(col_button3, INPUT_PULLUP);
+  pinMode(start_button, INPUT_PULLUP);
   pinMode(redpin, OUTPUT);
   pinMode(bluepin, OUTPUT);
   pinMode(yellowpin, OUTPUT);
-  pinMode(start_button, INPUT_PULLUP);
+  pinMode(startpin, OUTPUT);
   
   pinMode(IN1, OUTPUT);
   pinMode(IN2, OUTPUT);
@@ -116,11 +110,11 @@ void setup() {
 
 void loop() {
   if (timeLimit == 0) {
-    if (state < S1) {
+    if (state < S2) {
       startTime = millis();
-    } else {//if (state >= S2) {
+    } else {//if (state >= S3) {
       currentTime = millis();
-      if ((currentTime - startTime) >= 15000) {
+      if ((currentTime - startTime) >= 30000) {
         driveBot(0,0,ENA_left,IN1,IN2);
         driveBot(0,0,ENA_right,IN3,IN4);
         timeLimit = 1;
@@ -133,8 +127,10 @@ void loop() {
     yellow_color = !digitalRead(col_button2);
     blue_color = !digitalRead(col_button3);
     game_mode = !digitalRead(start_button);
-    Serial.print("red_color"); Serial.println(red_color); 
+//    Serial.print("red_color"); Serial.println(red_color); 
     Serial.print("game_mode"); Serial.println(game_mode);
+    Serial.print("state "); Serial.println(state);
+//    Serial.print("game state"); Serial.println(game_state);
   
     // Read motor encoder postions
     //  encPos_left = leftEncoder.read(); 
@@ -155,29 +151,34 @@ void loop() {
             digitalWrite(redpin, HIGH); // lighting up the red led as a visual indicator 
             nextState = S1; // transitioning into state S1
             color_state == HIGH; // setting the new color state to High
+            targetColor = 1;
         } else if (yellow_color == HIGH && (red_color == LOW && blue_color == LOW) && color_state == LOW){ // condition for selecting the yellow color and lighting up the yellow led
             digitalWrite(yellowpin, HIGH); // lighting up the yellow led as a visual indicator 
             nextState = S1; // transitioning into state S1
             color_state == HIGH; // setting the new color state to High
-            Serial.println("In S0: Color detected");
+            targetColor = 2;
         } else if (blue_color == HIGH && (yellow_color == LOW && red_color == LOW) && color_state == LOW){ // condition for selecting the blue color and lighting up the blue led
             digitalWrite(bluepin, HIGH); // lighting up the blue led as a visual indicator 
             nextState = S1; // transitioning into state S1
             color_state == HIGH; // setting the new color state to High
-            Serial.println("------------------------------------");
+            targetColor = 3;            
         }
-      break;
+        break;
       case S1:  // Game start specification
+        //digitalWrite(startpin,HIGH);
+        //nextState = S2;
+//        delay(500);
         if (game_mode == HIGH) {
-          Serial.println("++++++++++++++++++++++++++++++++");
           Serial.println("In S1: Start button pushed");
           digitalWrite(startpin, HIGH);
           nextState = S2;
-          delay(100);
-        } else {
-          digitalWrite(startpin, LOW);
-          nextState = S1;
+          game_state = HIGH;
         }
+        
+//        else {
+//          digitalWrite(startpin, LOW);
+//          nextState = S1;
+//        }
         break;
       case S2:  // Robot driving to pick up black line
         if (lineFound == 0) {
@@ -216,37 +217,36 @@ void loop() {
 //                  Serial.println("Arena Wall Detected, executing right hand turn");
 //                }
 //            }
-            if((mySensorBar.getPosition() > -25) && (mySensorBar.getPosition() < 25))  {
-              if(mySensorBar.getDensity() > 5) { 
-                  intersectCount++;
-                  if (intersectCount == 3) {
-                    actionID = STOP; robotDrivingActions(actionID);
-    //                [INSERT CODE BELOW]: Corner checking
-    //                drive slightly forward
-    //                get color info
-    //                if (color = target) {
-    //                  nextState = S4;
-    //                } else {
-    //                  nextState = S5;
-    //                }
-                  } else {
-                    nextState = S3; 
-                  }
-                } else {
-                  actionID = GO_FORWARD; robotDrivingActions(actionID); 
-                }
-            } else if( mySensorBar.getPosition() <= -25 ) {
-              actionID = CORRECT_LEFT; robotDrivingActions(actionID);
-            } else if( mySensorBar.getPosition() >= 25 ) {
-              actionID = CORRECT_RIGHT; robotDrivingActions(actionID);
-            } else {
-              nextState = S3;
-            }
+          if((mySensorBar.getPosition() > -25) && (mySensorBar.getPosition() < 25))  {
+            actionID = GO_FORWARD; robotDrivingActions(actionID); 
+          } else if( mySensorBar.getPosition() <= -25 ) {
+            actionID = CORRECT_LEFT; robotDrivingActions(actionID);
+          } else if( mySensorBar.getPosition() >= 25 ) {
+            actionID = CORRECT_RIGHT; robotDrivingActions(actionID);
+          } else {
+            nextState = S3;
+          }
 //            [INSERT CODE BELOW]: Turning after dropping a mole whacker
 //            if (drop_confirmed == 1) {
 //                drop_confirmed = 0;
 //                nextState = S5;
 //            }
+          if(mySensorBar.getDensity() > 5) { 
+            intersectCount++;
+            if (intersectCount == 3) {
+              actionID = STOP; robotDrivingActions(actionID);
+  //                [INSERT CODE BELOW]: Corner checking
+  //                drive slightly forward
+  //                get color info
+  //                if (color = target) {
+  //                  nextState = S4;
+  //                } else {
+  //                  nextState = S5;
+  //                }
+            } else {
+              nextState = S3; 
+            }
+          }
         }
         break;
       case S4:  // Mole whacker dropping
