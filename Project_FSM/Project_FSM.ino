@@ -26,15 +26,7 @@ int transition4 = 0;
 int transition5 = 0;
 int transition6 = 0;
 
-// Pin definitions
-const int leftLS_pin = A0;
-const int middleLS_pin = A1;
-const int rightLS_pin = A2;
-const int usEchoPin = 2;
-const int usTrigPin = 3;
-
 // Variable definitions and initialize inputs
-int start_state = 0;    // set to zero at starting
 int color_state = 0;    // set to zero at starting
 int game_state = 0;     // set to zero at starting
 int redpin = 23;        // pin for red led
@@ -42,26 +34,31 @@ int bluepin = 25;       // pin for blue led
 int yellowpin = 27;     // pin for yellow led
 int startpin = 29;      // pin for game mode led
 int col_button1 = 22;   // digital output corresponding to pushbutton 1
-int col_button2 = 24;   // digital output corresponding to pushbutton 2
-int col_button3 = 26;   // digital output corresponding to pushbutton 3
-int start_button = 28;  // digital output corresponding to start the game
+int col_button2 = 26;   // digital output corresponding to pushbutton 2
+int col_button3 = 24;   // digital output corresponding to pushbutton 3
+int start_button = 30;  // digital output corresponding to start the game
+int timeLimitPin = 39;  // digital output corresponding to exceeded time limit
 
 int red_color = 0;          // Mole location square color: 0 = off, 1 = on
 int yellow_color = 0;       // Mole location square color: 0 = off, 1 = on
 int blue_color = 0;         // Mole location square color: 0 = off, 1 = on
 int game_mode = 0;          // Game mode characterization: 0 = off, 1 = on
-int line_sensor = 0;        // Simulated line sensor input: 0 = line not detected, 1 = line detected
 int color_sensor = 0;       // Simulated color sensor input: 0 = not target mole location color, 1 = target mole location color 
 int ultrasonic_sensor = 0;  // Simulated ultrasonic sensor input: 0 = arena boundary not detected, 1 = arena boundary detected
 int encoder = 0;            // Simulated input to execute robot turn: 0 = robot not commanded to turn, 1 = robot commanded to turn
 int drop_count = 0;         // Counter to keep track of number of dropped mole whackers, counts by +1 for each successful drop, up-to 5
 int lineFound = 0;          // Binary variable characterizing the instance of finding black line
 int intersectCount = 0;     // Variable characterizing intersection of black lines
+float startTime = 0;        // Variable used to denote the beginning of the game
+float currentTime = 0;      // Time variable
+int timeLimit = 0;          // Characterizes if the 2-minute time limit is exceeded
 
-// Sensor read variable initializations
+// Sensor read variable initializations and pin definitions
   // Ultrasonic Sensor
 unsigned long usPreviousTime = 0;
 const int usReadDelay = 1000;
+const int usEchoPin = 2;
+const int usTrigPin = 3;
   // Motors
 int ENA_left = 2; int IN1 = 3; int IN2 = 4;
 //int encA_left = 5;
@@ -114,184 +111,264 @@ void setup() {
 
   mySensorBar.setBarStrobe();     //Default: the IR will only be turned on during reads.
   mySensorBar.clearInvertBits();  //Default: dark on light
-  mySensorBar.begin();    
+  mySensorBar.begin();  
   }
 
 void loop() {
-  // 1. Read sensor inputs
-  red_color = !digitalRead(col_button1);
-  yellow_color = !digitalRead(col_button2);
-  blue_color = !digitalRead(col_button3);
-  game_mode = !digitalRead(start_button);
-
-  // Read motor encoder postions
-  //  encPos_left = leftEncoder.read(); 
-  //  encPos_right = rightEncoder.read();
-  //  Serial.print("Left Encoder Position: "); Serial.println(encPos_left);
-  //  Serial.print("Right Encoder Position: "); Serial.println(encPos_right);
+  if (timeLimit == 0) {
+    if (state < S1) {
+      startTime = millis();
+    } else {//if (state >= S2) {
+      currentTime = millis();
+      if ((currentTime - startTime) >= 15000) {
+        driveBot(0,0,ENA_left,IN1,IN2);
+        driveBot(0,0,ENA_right,IN3,IN4);
+        timeLimit = 1;
+        digitalWrite(timeLimitPin,HIGH);
+        return;
+      }
+    }
+    // 1. Read sensor inputs
+    red_color = !digitalRead(col_button1);
+    yellow_color = !digitalRead(col_button2);
+    blue_color = !digitalRead(col_button3);
+    game_mode = !digitalRead(start_button);
+    Serial.print("red_color"); Serial.println(red_color); 
+    Serial.print("game_mode"); Serial.println(game_mode);
   
-  // Motor inputs
-  int trimIn = 0.05;    // Fraction of trim (between 0 and 1) used in line following
-  int driveIn = 50;     // Motor speed, PWM input
-  int driveDir = 1;     // Motor rotation direction, 1 for forward and -1 for backward
-  int correctIn = 0.2;  // Fraction of motor speed, used in line following
+    // Read motor encoder postions
+    //  encPos_left = leftEncoder.read(); 
+    //  encPos_right = rightEncoder.read();
+    //  Serial.print("Left Encoder Position: "); Serial.println(encPos_left);
+    //  Serial.print("Right Encoder Position: "); Serial.println(encPos_right);
     
-  // 2. Robot FSM
-  switch(state) {
-    case S0:  // Mole square color specification
-      if(red_color == HIGH && (yellow_color == LOW && blue_color == LOW) && color_state == LOW){ // condition for selecting the red color and lighting up the red led
-          digitalWrite(redpin, HIGH); // lighting up the red led as a visual indicator 
-          nextState = S1; // transitioning into state S1
-          color_state == HIGH; // setting the new color state to High
+    // Motor inputs
+    //int trimIn = 0.05;    // Fraction of trim (between 0 and 1) used in line following
+    int driveIn = 50;     // Motor speed, PWM input
+    int driveDir = 1;     // Motor rotation direction, 1 for forward and -1 for backward
+    //int correctIn = 0.2;  // Fraction of motor speed, used in line following
+      
+    // 2. Robot FSM
+    switch(state) {
+      case S0:  // Mole square color specification
+        if(red_color == HIGH && (yellow_color == LOW && blue_color == LOW) && color_state == LOW){ // condition for selecting the red color and lighting up the red led
+            digitalWrite(redpin, HIGH); // lighting up the red led as a visual indicator 
+            nextState = S1; // transitioning into state S1
+            color_state == HIGH; // setting the new color state to High
+        } else if (yellow_color == HIGH && (red_color == LOW && blue_color == LOW) && color_state == LOW){ // condition for selecting the yellow color and lighting up the yellow led
+            digitalWrite(yellowpin, HIGH); // lighting up the yellow led as a visual indicator 
+            nextState = S1; // transitioning into state S1
+            color_state == HIGH; // setting the new color state to High
+            Serial.println("In S0: Color detected");
+        } else if (blue_color == HIGH && (yellow_color == LOW && red_color == LOW) && color_state == LOW){ // condition for selecting the blue color and lighting up the blue led
+            digitalWrite(bluepin, HIGH); // lighting up the blue led as a visual indicator 
+            nextState = S1; // transitioning into state S1
+            color_state == HIGH; // setting the new color state to High
+            Serial.println("------------------------------------");
         }
-      else if(yellow_color == HIGH && (red_color == LOW && blue_color == LOW) && color_state == LOW){ // condition for selecting the yellow color and lighting up the yellow led
-          digitalWrite(yellowpin, HIGH); // lighting up the yellow led as a visual indicator 
-          nextState = S1; // transitioning into state S1
-          color_state == HIGH; // setting the new color state to High
-        }
-      else if(blue_color == HIGH && (yellow_color == LOW && red_color == LOW) && color_state == LOW){ // condition for selecting the blue color and lighting up the blue led
-          digitalWrite(bluepin, HIGH); // lighting up the blue led as a visual indicator 
-          nextState = S1; // transitioning into state S1
-          color_state == HIGH; // setting the new color state to High
-        }
-    break;
-    case S1:  // Game start specification
-      if(game_mode == HIGH && game_state == LOW){ // checking the previous state and the current state
-        if(start_state == 0){ // if robot is not moving go to state 2
-          nextState = S2;
-          start_state = 1;
+      break;
+      case S1:  // Game start specification
+        if (game_mode == HIGH) {
+          Serial.println("++++++++++++++++++++++++++++++++");
+          Serial.println("In S1: Start button pushed");
           digitalWrite(startpin, HIGH);
-          }
-        else{
-          digitalWrite(startpin, LOW);
-          start_state = 0;
-          nextState = S1;
-          }
-        game_state = game_mode;
-        delay(500);
+          nextState = S2;
+          delay(100);
         } else {
           digitalWrite(startpin, LOW);
           nextState = S1;
         }
-      break;
-    case S2:  // Robot driving to pick up black line
-      if (lineFound == 0) {
-        driveBot(driveIn,1,ENA_left,IN1,IN2);
-        driveBot(driveIn,1,ENA_right,IN3,IN4);
-        lineFound = 1;
-        nextState = S2;
-      }
-      if(mySensorBar.getDensity() > 3 ) { 
-        driveBot(0,0,ENA_left,IN1,IN2);
-        driveBot(0,0,ENA_right,IN3,IN4);
-        actionID = STOP;
-        robotActions_S2S3(actionID,driveIn);
-      }
-      if (lineFound == 1) {
-        actionID = TURN_LEFT;
-        robotActions_S2S3(actionID,driveIn);
-      }
-      nextState = S3;
-      break;
-    case S3:  // Robot line following
-      //digitalWrite(5,1);
-      // ROBOT DRIVING FORWARD, LINE FOLLOWING
-      // *** INSERT LINE FOLLOWING CODE HERE ***
-//      leftLS = readLineSensor(leftLS_pin);
-//      middleLS = readLineSensor(middleLS_pin);
-//      rightLS = readLineSensor(rightLS_pin);
-      if (drop_count == 5) {
-        Serial.println("In S3: Robot Driving Home, waiting for color sensor to detect white square");
-        nextState = S3;      
-        if (serial_input == 'W') {
+        break;
+      case S2:  // Robot driving to pick up black line
+        if (lineFound == 0) {
+          driveBot(driveIn,1,ENA_left,IN1,IN2);
+          driveBot(driveIn,1,ENA_right,IN3,IN4);
+          nextState = S2;
+        }
+        if(mySensorBar.getDensity() > 5) { 
+          driveBot(0,0,ENA_left,IN1,IN2);
+          driveBot(0,0,ENA_right,IN3,IN4);
+          lineFound = 1;
+          actionID = STOP; robotDrivingActions(actionID);
+          actionID = TURN_LEFT; robotDrivingActions(actionID);
+          nextState = S3;
+        }
+        break;
+      case S3:  // Robot line following
+        // ROBOT DRIVING FORWARD, LINE FOLLOWING
+        if (drop_count == 5) {
+          Serial.println("In S3: Robot Driving Home, waiting for color sensor to detect white square");
           nextState = S6;
-          Serial.println("All mole whackers dropped, robot back at home and turning off");
-        }
-      } else {
-          // ROBOT DRIVING FORWARD, LINE FOLLOWING AWAITING INFORMATION FROM COLOR SENSOR
-          Serial.print("In S3: Robot Driving, awaiting Input for target color from Color Sensor - ");
-          Serial.print("Mole Whackers Left: "); Serial.println(5-drop_count);
-          if (transition4 == 0) {
-            if (serial_input == 'T') { // if TARGET SQUARE COLOR IS DETECTED
-              color_sensor = 1; nextState = S4; transition4 = 1; transition5 = 0; transition6 = 0;
-              //digitalWrite(5,0);
-              Serial.println("Target Mole Color Detected, transitioning to drop mole whacker");
+        } else {
+            Serial.print("In S3: Robot Driving, awaiting Input for target color from Color Sensor - ");
+            Serial.print("Mole Whackers Left: "); Serial.println(5-drop_count);
+//            unsigned long usCurrentTime = millis();  
+//            if (usCurrentTime - usPreviousTime >= usReadDelay) {
+//              const int trigLength = 10;  
+//              digitalWrite(usTrigPin,HIGH); delayMicroseconds(trigLength); digitalWrite(usTrigPin,LOW);
+//              long duration = pulseIn(usEchoPin,HIGH);
+//              float distance = duration*(343/1e6)*0.5; // Units: [m], Speed of sound units: [m/us]
+//              usPreviousTime = usCurrentTime;
+//              if (0.28 < distance < 0.32) {
+//                  // ultrasonic_sensor = 1; encoder = 1; 
+//                  // TRANSITION TO S5 AND START TURNING
+//                  nextState = S5;
+//                  Serial.println("Arena Wall Detected, executing right hand turn");
+//                }
+//            }
+            if((mySensorBar.getPosition() > -25) && (mySensorBar.getPosition() < 25))  {
+              if(mySensorBar.getDensity() > 5) { 
+                  intersectCount++;
+                  if (intersectCount == 3) {
+                    actionID = STOP; robotDrivingActions(actionID);
+    //                [INSERT CODE BELOW]: Corner checking
+    //                drive slightly forward
+    //                get color info
+    //                if (color = target) {
+    //                  nextState = S4;
+    //                } else {
+    //                  nextState = S5;
+    //                }
+                  } else {
+                    nextState = S3; 
+                  }
+                } else {
+                  actionID = GO_FORWARD; robotDrivingActions(actionID); 
+                }
+            } else if( mySensorBar.getPosition() <= -25 ) {
+              actionID = CORRECT_LEFT; robotDrivingActions(actionID);
+            } else if( mySensorBar.getPosition() >= 25 ) {
+              actionID = CORRECT_RIGHT; robotDrivingActions(actionID);
             } else {
-              color_sensor = 0; nextState = S3; transition4 = 0; transition5 = 0; transition6 = 0;
+              nextState = S3;
             }
-          }
-          if (transition5 == 0) {
-          unsigned long currentTime = millis();  
-            if (currentTime - usPreviousTime >= usReadDelay) {
-              const int trigLength = 10;  
-              digitalWrite(usTrigPin,HIGH); delayMicroseconds(trigLength); digitalWrite(usTrigPin,LOW);
-              long duration = pulseIn(usEchoPin,HIGH);
-              float distance = duration*(343/1e6)*0.5; // Units: [m], Speed of sound units: [m/us]
-              usPreviousTime = currentTime;
-            if (0.28 < distance < 0.32) {
-                // ultrasonic_sensor = 1; encoder = 1; 
-                // TRANSITION TO S5 AND START TURNING
-                nextState = S5; transition4 = 0; transition5 = 1; transition6 = 0;
-                digitalWrite(6,1);
-                Serial.println("Arena Wall Detected, executing right hand turn");
-              }
-            }
-          }
-      }
-      break;
-    case S4:  // Mole whacker dropping
-      Serial.println("In S4: Robot deploying mole whacker while Driving, awaiting mole whacker drop confirmation");
-      if (transition4 == 1) {
-        if (serial_input == 'M') {
-          drop_count++; nextState = S3; transition4 = 0; color_sensor = 0;
-          Serial.println("Mole whacker drop confirmed, transitioning back to S3");
+//            [INSERT CODE BELOW]: Turning after dropping a mole whacker
+//            if (drop_confirmed == 1) {
+//                drop_confirmed = 0;
+//                nextState = S5;
+//            }
         }
-      } else {
-          nextState = S4; transition4 = 1;
-      }
-      break;
-    case S5:  // Robot turning to continue line following
-      Serial.println("In S5: Robot detected arena wall, executing right hand turn");
-      // EXECUTE TURN
-//      leftLS = readLineSensor(leftLS_pin);
-//      middleLS = readLineSensor(middleLS_pin);
-//      rightLS = readLineSensor(rightLS_pin);
-      if (transition5 == 1) { // if TURN IS COMPLETED, TRANSITION BACK TO S3
-//        if ((leftLS < lineThreshold)&&(middleLS > lineThreshold)&&(rightLS < lineThreshold)) {
-          nextState = S3; transition5 = 0; ultrasonic_sensor = 0; encoder = 0;
-          digitalWrite(6,0);
-          Serial.println("Right hand turn complete, transitioning back to S3");
-      } else {
-          nextState = S5; transition5 = 1;
-      }
-      break;
-    case S6:  // Returm home
-      digitalWrite(7,1);
-      Serial.println("In S6: Robot at home after Mole Whackers deployed, travelling into Home square and shutting down");
-      delay(1000);
-      Serial.println("Mission Complete");
-      nextState = S0; transition1 = 0;
-      digitalWrite(2,0); digitalWrite(3,0); digitalWrite(4,0); digitalWrite(5,0); digitalWrite(6,0); digitalWrite(7,0);
-      break;
+        break;
+      case S4:  // Mole whacker dropping
+        Serial.println("Simulated Mole Whacker Drop");
+//        Serial.println("In S4: Robot deploying mole whacker while Driving, awaiting mole whacker drop confirmation");
+//        if (transition4 == 1) {
+//          if (serial_input == 'M') {
+//            drop_count++; nextState = S3; transition4 = 0; color_sensor = 0;
+//            Serial.println("Mole whacker drop confirmed, transitioning back to S3");
+//          }
+//        } else {
+//            nextState = S4; transition4 = 1;
+//        }
+        break;
+      case S5:  // Robot turning to continue line following
+        Serial.println("In S5: Robot detected arena wall, executing right hand turn");
+        actionID = STOP; robotDrivingActions(actionID);
+        actionID = TURN_RIGHT; robotDrivingActions(actionID);
+        nextState = S3;
+        intersectCount = 0;
+        break;
+      case S6:  // Return home
+//            unsigned long usCurrentTime = millis();  
+//            if (usCurrentTime - usPreviousTime >= usReadDelay) {
+//              const int trigLength = 10;  
+//              digitalWrite(usTrigPin,HIGH); delayMicroseconds(trigLength); digitalWrite(usTrigPin,LOW);
+//              long duration = pulseIn(usEchoPin,HIGH);
+//              float distance = duration*(343/1e6)*0.5; // Units: [m], Speed of sound units: [m/us]
+//              usPreviousTime = usCurrentTime;
+//              if (0.28 < distance < 0.32) {
+//                  // ultrasonic_sensor = 1; encoder = 1; 
+//                  // TRANSITION TO S5 AND START TURNING
+//                  nextState = S5;
+//                  Serial.println("Arena Wall Detected, executing right hand turn");
+//                }
+//            }
+            if((mySensorBar.getPosition() > -25) && (mySensorBar.getPosition() < 25))  {
+              if(mySensorBar.getDensity() > 5) { 
+                  intersectCount++;
+                  if (intersectCount == 3) {
+                    actionID = STOP; robotDrivingActions(actionID);
+      //            [INSERT CODE BELOW]: Entering white square after objectives achieved
+      //            if (any_color == white) {
+      //              find where white is detected
+      //              if (white == right_side) {
+      //                drive forward
+      //                delay(500);
+      //                turn right
+      //                timeLimit = 1; 
+      //              } else if (white == leftt_side) {
+      //                drive forward
+      //                delay(500);
+      //                turn left
+      //                timeLimit = 1;                 
+      //              }
+      //            }                    
+                  } else {
+                    nextState = S3; 
+                  }
+                } else {
+                  actionID = GO_FORWARD; robotDrivingActions(actionID); 
+                }
+            } else if( mySensorBar.getPosition() <= -25 ) {
+              actionID = CORRECT_LEFT; robotDrivingActions(actionID);
+            } else if( mySensorBar.getPosition() >= 25 ) {
+              actionID = CORRECT_RIGHT; robotDrivingActions(actionID);
+            } else {
+              nextState = S3;
+            }
+        break;
+    }
+    state = nextState;
+  } else {
+    driveBot(0,0,ENA_left,IN1,IN2);
+    driveBot(0,0,ENA_right,IN3,IN4);
+    timeLimit = 1;
+    digitalWrite(timeLimitPin,HIGH);
+    delay(500);
+    digitalWrite(timeLimitPin,LOW);
+    delay(500);
   }
-  state = nextState;
 }
 
-void robotActions_S2S3(int actionIDs,int driveIn) {
-  int nextAction;
+void robotDrivingActions(int actionIDs) {
+//  int nextAction;
+  int trimIn = 0.05;    // Fraction of trim (between 0 and 1) used in line following
+  int driveIn = 50;     // Motor speed, PWM input
+  int driveDir = 1;     // Motor rotation direction, 1 for forward and -1 for backward
+  int correctIn = 0.2;  // Fraction of motor speed, used in line following
   switch (actionIDs) {
     case STOP:
       driveBot(0,0,ENA_left,IN1,IN2);
       driveBot(0,0,ENA_right,IN3,IN4);
       Serial.println("Executing STOP action");
+      delay(500);
       break;
     case TURN_LEFT:
+      driveBot(driveIn,1,ENA_left,IN1,IN2);
+      driveBot((driveIn-driveIn)+5,-1,ENA_right,IN3,IN4);
+      delay(1500);
+      break;
+    case TURN_RIGHT:
       driveBot((driveIn-driveIn)+5,-1,ENA_left,IN1,IN2);
       driveBot(driveIn,1,ENA_right,IN3,IN4);
+      delay(1500);
       break;
+    case GO_FORWARD:
+      driveBot(driveIn,1,ENA_left,IN1,IN2);
+      driveBot(driveIn,1,ENA_right,IN3,IN4);
+      break;
+    case CORRECT_LEFT:
+      turnBot(correctIn,trimIn,ENA_left,IN1,IN2);
+      turnBot(correctIn,(trimIn-trimIn),ENA_right,IN3,IN4);
+      Serial.println("Correcting Left");
+      break;
+    case CORRECT_RIGHT:
+      turnBot(correctIn,(trimIn-trimIn),ENA_left,IN1,IN2);
+      turnBot(correctIn,trimIn,ENA_right,IN3,IN4);    
+      Serial.println("Correcting Right");
+      break;   
   }
 }
-
 
 void driveBot(int driveInput,int driveDir,int pinEN,int pinIN_1,int pinIN_2) {
   analogWrite(pinEN,driveInput);
