@@ -24,11 +24,11 @@ int game_state = 0;     // set to zero at starting
 int redpin = 23;        // pin for red led
 int bluepin = 25;       // pin for blue led
 int yellowpin = 27;     // pin for yellow led
-int startpin = 49;      // pin for game mode led
+int startpin = 29;      // pin for game mode led
 int col_button1 = 22;   // digital output corresponding to pushbutton 1
 int col_button2 = 26;   // digital output corresponding to pushbutton 2
 int col_button3 = 24;   // digital output corresponding to pushbutton 3
-int start_button = 47;  // digital output corresponding to start the game
+int start_button = 28;  // digital output corresponding to start the game
 int timeLimitPin = 39;  // digital output corresponding to exceeded time limit
 
 int red_color = 0;          // Mole location square color: 0 = off, 1 = on
@@ -128,9 +128,9 @@ void loop() {
     blue_color = !digitalRead(col_button3);
     game_mode = !digitalRead(start_button);
 //    Serial.print("red_color"); Serial.println(red_color); 
-    Serial.print("game_mode"); Serial.println(game_mode);
-    Serial.print("state "); Serial.println(state);
-//    Serial.print("game state"); Serial.println(game_state);
+//    Serial.print("game_mode"); Serial.println(game_mode);
+//    Serial.print("state "); Serial.println(state);
+    Serial.print("game state"); Serial.println(game_state);
   
     // Read motor encoder postions
     //  encPos_left = leftEncoder.read(); 
@@ -169,12 +169,10 @@ void loop() {
         //nextState = S2;
 //        delay(500);
         if (game_mode == HIGH) {
-          Serial.println("In S1: Start button pushed");
           digitalWrite(startpin, HIGH);
           nextState = S2;
           game_state = HIGH;
-        }
-        
+        }      
 //        else {
 //          digitalWrite(startpin, LOW);
 //          nextState = S1;
@@ -190,8 +188,10 @@ void loop() {
           driveBot(0,0,ENA_left,IN1,IN2);
           driveBot(0,0,ENA_right,IN3,IN4);
           lineFound = 1;
-          actionID = STOP; robotDrivingActions(actionID);
-          actionID = TURN_LEFT; robotDrivingActions(actionID);
+          actionID = STOP; 
+          robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
+          actionID = TURN_RIGHT; 
+          robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
           nextState = S3;
         }
         break;
@@ -200,9 +200,41 @@ void loop() {
         if (drop_count == 5) {
           Serial.println("In S3: Robot Driving Home, waiting for color sensor to detect white square");
           nextState = S6;
+        } 
+//        Serial.print("In S3: Robot Driving, awaiting Input for target color from Color Sensor - ");
+//        Serial.print("Mole Whackers Left: "); Serial.println(5-drop_count);
+        Serial.println(mySensorBar.getPosition());
+        if((mySensorBar.getPosition() > -25) && (mySensorBar.getPosition() < 25))  {
+          actionID = GO_FORWARD; 
+          robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4); 
+          nextState = S3;
+        } else if( mySensorBar.getPosition() <= -25 ) {
+          actionID = CORRECT_LEFT; 
+          robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
+          nextState = S3;
+        } else if( mySensorBar.getPosition() >= 25 ) {
+          actionID = CORRECT_RIGHT; 
+          robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
+          nextState = S3;
         } else {
-            Serial.print("In S3: Robot Driving, awaiting Input for target color from Color Sensor - ");
-            Serial.print("Mole Whackers Left: "); Serial.println(5-drop_count);
+          nextState = S3;
+        }
+        if(mySensorBar.getDensity() > 5) { 
+          intersectCount++;
+          if (intersectCount == 3) {
+            actionID = STOP; robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
+//                [INSERT CODE BELOW]: Corner checking
+//                drive slightly forward
+//                get color info
+//                if (color = target) {
+//                  nextState = S4;
+//                } else {
+//                  nextState = S5;
+//                }
+          } else {
+            nextState = S3; 
+          }
+        }
 //            unsigned long usCurrentTime = millis();  
 //            if (usCurrentTime - usPreviousTime >= usReadDelay) {
 //              const int trigLength = 10;  
@@ -216,38 +248,12 @@ void loop() {
 //                  nextState = S5;
 //                  Serial.println("Arena Wall Detected, executing right hand turn");
 //                }
-//            }
-          if((mySensorBar.getPosition() > -25) && (mySensorBar.getPosition() < 25))  {
-            actionID = GO_FORWARD; robotDrivingActions(actionID); 
-          } else if( mySensorBar.getPosition() <= -25 ) {
-            actionID = CORRECT_LEFT; robotDrivingActions(actionID);
-          } else if( mySensorBar.getPosition() >= 25 ) {
-            actionID = CORRECT_RIGHT; robotDrivingActions(actionID);
-          } else {
-            nextState = S3;
-          }
+//            }        
 //            [INSERT CODE BELOW]: Turning after dropping a mole whacker
 //            if (drop_confirmed == 1) {
 //                drop_confirmed = 0;
 //                nextState = S5;
-//            }
-          if(mySensorBar.getDensity() > 5) { 
-            intersectCount++;
-            if (intersectCount == 3) {
-              actionID = STOP; robotDrivingActions(actionID);
-  //                [INSERT CODE BELOW]: Corner checking
-  //                drive slightly forward
-  //                get color info
-  //                if (color = target) {
-  //                  nextState = S4;
-  //                } else {
-  //                  nextState = S5;
-  //                }
-            } else {
-              nextState = S3; 
-            }
-          }
-        }
+//            }        
         break;
       case S4:  // Mole whacker dropping
         Serial.println("Simulated Mole Whacker Drop");
@@ -263,8 +269,8 @@ void loop() {
         break;
       case S5:  // Robot turning to continue line following
         Serial.println("In S5: Robot detected arena wall, executing right hand turn");
-        actionID = STOP; robotDrivingActions(actionID);
-        actionID = TURN_RIGHT; robotDrivingActions(actionID);
+        actionID = STOP; robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
+        actionID = TURN_RIGHT; robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
         nextState = S3;
         intersectCount = 0;
         break;
@@ -287,7 +293,7 @@ void loop() {
               if(mySensorBar.getDensity() > 5) { 
                   intersectCount++;
                   if (intersectCount == 3) {
-                    actionID = STOP; robotDrivingActions(actionID);
+                    actionID = STOP; robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
       //            [INSERT CODE BELOW]: Entering white square after objectives achieved
       //            if (any_color == white) {
       //              find where white is detected
@@ -307,12 +313,12 @@ void loop() {
                     nextState = S3; 
                   }
                 } else {
-                  actionID = GO_FORWARD; robotDrivingActions(actionID); 
+                  actionID = GO_FORWARD; robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4); 
                 }
             } else if( mySensorBar.getPosition() <= -25 ) {
-              actionID = CORRECT_LEFT; robotDrivingActions(actionID);
+              actionID = CORRECT_LEFT; robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
             } else if( mySensorBar.getPosition() >= 25 ) {
-              actionID = CORRECT_RIGHT; robotDrivingActions(actionID);
+              actionID = CORRECT_RIGHT; robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
             } else {
               nextState = S3;
             }
@@ -330,8 +336,7 @@ void loop() {
   }
 }
 
-void robotDrivingActions(int actionIDs) {
-//  int nextAction;
+void robotDrivingActions(int actionIDs,int ENA_left,int IN1,int IN2,int ENA_right,int IN3,int IN4) {
   int trimIn = 0.05;    // Fraction of trim (between 0 and 1) used in line following
   int driveIn = 50;     // Motor speed, PWM input
   int driveDir = 1;     // Motor rotation direction, 1 for forward and -1 for backward
@@ -360,12 +365,11 @@ void robotDrivingActions(int actionIDs) {
     case CORRECT_LEFT:
       turnBot(correctIn,trimIn,ENA_left,IN1,IN2);
       turnBot(correctIn,(trimIn-trimIn),ENA_right,IN3,IN4);
-      Serial.println("Correcting Left");
       break;
     case CORRECT_RIGHT:
+      Serial.println("Correcting Right");
       turnBot(correctIn,(trimIn-trimIn),ENA_left,IN1,IN2);
       turnBot(correctIn,trimIn,ENA_right,IN3,IN4);    
-      Serial.println("Correcting Right");
       break;   
   }
 }
