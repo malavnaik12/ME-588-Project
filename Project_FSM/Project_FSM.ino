@@ -46,6 +46,12 @@ float currentTime = 0;      // Time variable
 int timeLimit = 0;          // Characterizes if the 2-minute time limit is exceeded
 int targetColor = 0;        // Integer characterizes the target color: 1 = red, 2 = yellow, 3 = blue
 
+// Motor inputs
+//float trimIn = 0.5;    // Fraction of trim (between 0 and 1) used in line following
+int driveIn = 50;     // Motor speed, PWM input
+int driveDir = 1;     // Motor rotation direction, 1 for forward and -1 for backward
+//float correctIn = 0.3;  // Fraction of motor speed, used in line following
+
 // Sensor read variable initializations and pin definitions
   // Ultrasonic Sensor
 unsigned long usPreviousTime = 0;
@@ -114,7 +120,7 @@ void loop() {
       startTime = millis();
     } else {//if (state >= S3) {
       currentTime = millis();
-      if ((currentTime - startTime) >= 30000) {
+      if ((currentTime - startTime) >= 120000) {
         driveBot(0,0,ENA_left,IN1,IN2);
         driveBot(0,0,ENA_right,IN3,IN4);
         timeLimit = 1;
@@ -131,21 +137,18 @@ void loop() {
 //    Serial.print("game_mode"); Serial.println(game_mode);
 //    Serial.print("state "); Serial.println(state);
     Serial.print("game state"); Serial.println(game_state);
-  
+    Serial.print("state"); Serial.println(state);
+//    Serial.print(actionID);
     // Read motor encoder postions
     //  encPos_left = leftEncoder.read(); 
     //  encPos_right = rightEncoder.read();
     //  Serial.print("Left Encoder Position: "); Serial.println(encPos_left);
     //  Serial.print("Right Encoder Position: "); Serial.println(encPos_right);
     
-    // Motor inputs
-    //int trimIn = 0.05;    // Fraction of trim (between 0 and 1) used in line following
-    int driveIn = 50;     // Motor speed, PWM input
-    int driveDir = 1;     // Motor rotation direction, 1 for forward and -1 for backward
-    //int correctIn = 0.2;  // Fraction of motor speed, used in line following
       
     // 2. Robot FSM
     switch(state) {
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
       case S0:  // Mole square color specification
         if(red_color == HIGH && (yellow_color == LOW && blue_color == LOW) && color_state == LOW){ // condition for selecting the red color and lighting up the red led
             digitalWrite(redpin, HIGH); // lighting up the red led as a visual indicator 
@@ -164,6 +167,7 @@ void loop() {
             targetColor = 3;            
         }
         break;
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
       case S1:  // Game start specification
         //digitalWrite(startpin,HIGH);
         //nextState = S2;
@@ -178,6 +182,7 @@ void loop() {
 //          nextState = S1;
 //        }
         break;
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
       case S2:  // Robot driving to pick up black line
         if (lineFound == 0) {
           driveBot(driveIn,1,ENA_left,IN1,IN2);
@@ -195,6 +200,7 @@ void loop() {
           nextState = S3;
         }
         break;
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
       case S3:  // Robot line following
         // ROBOT DRIVING FORWARD, LINE FOLLOWING
         if (drop_count == 5) {
@@ -255,6 +261,8 @@ void loop() {
 //                nextState = S5;
 //            }        
         break;
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
       case S4:  // Mole whacker dropping
         Serial.println("Simulated Mole Whacker Drop");
 //        Serial.println("In S4: Robot deploying mole whacker while Driving, awaiting mole whacker drop confirmation");
@@ -267,6 +275,8 @@ void loop() {
 //            nextState = S4; transition4 = 1;
 //        }
         break;
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
       case S5:  // Robot turning to continue line following
         Serial.println("In S5: Robot detected arena wall, executing right hand turn");
         actionID = STOP; robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
@@ -335,12 +345,12 @@ void loop() {
     delay(500);
   }
 }
-
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void robotDrivingActions(int actionIDs,int ENA_left,int IN1,int IN2,int ENA_right,int IN3,int IN4) {
-  int trimIn = 0.05;    // Fraction of trim (between 0 and 1) used in line following
-  int driveIn = 50;     // Motor speed, PWM input
-  int driveDir = 1;     // Motor rotation direction, 1 for forward and -1 for backward
-  int correctIn = 0.2;  // Fraction of motor speed, used in line following
+//  int trimIn = 0.05;    // Fraction of trim (between 0 and 1) used in line following
+//  int driveIn = 50;     // Motor speed, PWM input
+//  int driveDir = 1;     // Motor rotation direction, 1 for forward and -1 for backward
+//  float correctIn = .2;  // Fraction of motor speed, used in line following
   switch (actionIDs) {
     case STOP:
       driveBot(0,0,ENA_left,IN1,IN2);
@@ -395,6 +405,7 @@ void turnBot(float turnInput,float trimInput,int pinEN,int pinIN_1,int pinIN_2) 
   } else {
     driveOut = 255*((-1*turnInput) + trimInput);
   }
+  //Serial.println(driveOut);
   analogWrite(pinEN,driveOut);
   digitalWrite(pinIN_1, HIGH);
   digitalWrite(pinIN_2, LOW);
