@@ -322,8 +322,9 @@ void loop() {
                     }
                  }
                  driveIn = 60;
-                 driveBot(driveIn,-1,ENA_left,IN1,IN2);
-                 driveBot(driveIn,-1,ENA_right,IN3,IN4);
+                 drop_confirmed = 1;
+//                 driveBot(driveIn,-1,ENA_left,IN1,IN2);
+//                 driveBot(driveIn,-1,ENA_right,IN3,IN4);
 //            const int trigLength = 10;
 //            digitalWrite(usTrigPin,HIGH); delayMicroseconds(trigLength); digitalWrite(usTrigPin,LOW);
 //            long duration = pulseIn(usEchoPin,HIGH);
@@ -332,11 +333,11 @@ void loop() {
 //              driveBot(driveIn,-1,ENA_left,IN1,IN2);
 //              driveBot(driveIn,-1,ENA_right,IN3,IN4);
 //            }
-                if(mySensorBar.getDensity() > 5) { 
-                delay(100);
-                intersectCount = 0;
-                nextState = S5;
-                }                 
+//                if(mySensorBar.getDensity() > 5) { 
+//                delay(100);
+//                intersectCount = 0;
+//                nextState = S5;
+//                }                 
 //              delay(500);
 //              char detectedColor = getColor(FLcolorsensor);
 //              if (detectedColor == dropcolor) {
@@ -387,24 +388,26 @@ void loop() {
 //                drop_confirmed = 0;
 //                nextState = S5;
 //            }
-//        if (drop_confirmed == 1) {
-//            driveBot(driveIn,-1,ENA_left,IN1,IN2);
-//            driveBot(driveIn,-1,ENA_right,IN3,IN4);          
-////            const int trigLength = 10;
-////            digitalWrite(usTrigPin,HIGH); delayMicroseconds(trigLength); digitalWrite(usTrigPin,LOW);
-////            long duration = pulseIn(usEchoPin,HIGH);
-////            float distance = duration*(343/1e6)*0.5; // Units: [m], Speed of sound units: [m/us]
-////            if ((0.3 < distance) && (distance < 0.65)) {          
-////              driveBot(driveIn,-1,ENA_left,IN1,IN2);
-////              driveBot(driveIn,-1,ENA_right,IN3,IN4);
-////            }
-//            if(mySensorBar.getDensity() > 5) { 
-//            delay(100);
-//            drop_confirmed = 0;
-//            intersectCount = 0;
-//            nextState = S5;
+        if (drop_confirmed == 1) {
+            driveBot(driveIn,-1,ENA_left,IN1,IN2);
+            driveBot(driveIn,-1,ENA_right,IN3,IN4);          
+//            const int trigLength = 10;
+//            digitalWrite(usTrigPin,HIGH); delayMicroseconds(trigLength); digitalWrite(usTrigPin,LOW);
+//            long duration = pulseIn(usEchoPin,HIGH);
+//            float distance = duration*(343/1e6)*0.5; // Units: [m], Speed of sound units: [m/us]
+//            if ((0.3 < distance) && (distance < 0.65)) {          
+//              driveBot(driveIn,-1,ENA_left,IN1,IN2);
+//              driveBot(driveIn,-1,ENA_right,IN3,IN4);
 //            }
-//        }
+            if(mySensorBar.getDensity() > 5) { 
+//            delay(100);
+              drop_confirmed = 0;
+              intersectCount = 0;
+//              actionID = STOP; robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
+              actionID = TURN_RIGHT; robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
+              nextState = S3;
+            }
+        }
         break;
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -512,16 +515,16 @@ void robotDrivingActions(int actionIDs,int ENA_left,int IN1,int IN2,int ENA_righ
       driveBot(driveIn,1,ENA_left,IN1,IN2);
       driveBot((driveIn-driveIn)+5,-1,ENA_right,IN3,IN4);
       delay(300);
-//      while(mySensorBar.getPosition() < -25 && mySensorBar.getPosition() !=0){
       while(mySensorBar.getDensity() != 2) {
         driveBot(driveIn,1,ENA_left,IN1,IN2);
         driveBot((driveIn-driveIn)+5,-1,ENA_right,IN3,IN4);
       }
+      delay(250);
+//      while(mySensorBar.getPosition() < -25 && mySensorBar.getPosition() !=0){      
 //      while(mySensorBar.getPosition() != 0) {
 //        driveBot(driveIn,1,ENA_left,IN1,IN2);
 //        driveBot((driveIn-driveIn)+5,-1,ENA_right,IN3,IN4);
 //      }
-      delay(250);
 //      driveBot(driveIn,1,ENA_left,IN1,IN2);
 //      driveBot((driveIn-driveIn)+5,-1,ENA_right,IN3,IN4);
 ////      delay(1000);
@@ -531,12 +534,12 @@ void robotDrivingActions(int actionIDs,int ENA_left,int IN1,int IN2,int ENA_righ
       driveBot((driveIn-driveIn)+5,-1,ENA_left,IN1,IN2);
       driveBot(driveIn,1,ENA_right,IN3,IN4);
       delay(300);
-//      while(mySensorBar.getPosition() < -25 && mySensorBar.getPosition() !=0){
       while(mySensorBar.getDensity() != 2) {
         driveBot((driveIn-driveIn)+5,-1,ENA_left,IN1,IN2);
         driveBot(driveIn,1,ENA_right,IN3,IN4);
       }
-      delay(250);      
+      delay(250);
+//      while(mySensorBar.getPosition() < -25 && mySensorBar.getPosition() !=0){            
 //      while(mySensorBar.getPosition() != 0) {
 //        driveBot(driveIn,1,ENA_left,IN1,IN2);
 //        driveBot((driveIn-driveIn)+5,-1,ENA_right,IN3,IN4);
