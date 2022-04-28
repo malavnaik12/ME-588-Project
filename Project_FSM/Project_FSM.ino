@@ -49,11 +49,11 @@ int targetColor = 0;        // Integer characterizes the target color: 1 = red, 
 int drop_confirmed = 0; 
 
 // Motor inputs
-//float trimIn = 0.5;    // Fraction of trim (between 0 and 1) used in line following
-int driveIn = 55;     // Motor speed, PWM input
-float inchForward = 10; // Motor speed for inching 
+float trimIn = 0.8;    // Fraction of trim (between 0 and 1) used in line following
+int driveIn = 60;     // Motor speed, PWM input
+float inchForward = 30; // Motor speed for inching 
 int driveDir = 1;     // Motor rotation direction, 1 for forward and -1 for backward
-//float correctIn = 0.3;  // Fraction of motor speed, used in line following
+float correctIn = 0.5;  // Fraction of motor speed, used in line following
 
 // Sensor read variable initializations and pin definitions
   // Ultrasonic Sensor
@@ -275,18 +275,18 @@ void loop() {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
       case S3:  // Robot line following
         // ROBOT DRIVING FORWARD, LINE FOLLOWING
-        if (drop_count == 5) {
-          Serial.println("In S3: Robot Driving Home, waiting for color sensor to detect white square");
-          nextState = S6;
-        } 
+//        if (drop_count == 5) {
+//          Serial.println("In S3: Robot Driving Home, waiting for color sensor to detect white square");
+//          nextState = S6;
+//        } 
         Serial.println(mySensorBar.getPosition());
         if((mySensorBar.getPosition() > -25) && (mySensorBar.getPosition() < 25))  {
           actionID = GO_FORWARD; 
           robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4); 
           nextState = S3;
         } else if( mySensorBar.getPosition() <= -25 ) {
-          actionID = CORRECT_LEFT; 
-          robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
+          actionID = CORRECT_LEFT;
+          robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);         
           nextState = S3;
         } else if( mySensorBar.getPosition() >= 25 ) {
           actionID = CORRECT_RIGHT; 
@@ -296,29 +296,68 @@ void loop() {
           nextState = S3;
         }
         if(mySensorBar.getDensity() > 5) { 
-          delay(400);
-          intersectCount++;         
+          delay(250);
+          intersectCount++;
+          Serial.print("Intersect Count"); Serial.println(intersectCount);
           if (intersectCount == 3) {
-            actionID = STOP; robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
-//            nextState = S5;
-//                [INSERT CODE BELOW]: Corner checking
-            driveBot(inchForward,1,ENA_left,IN1,IN2);
-            driveBot(inchForward,1,ENA_right,IN3,IN4);
-            char detectedColor = getColor(FLcolorsensor);
-            if (detectedColor == dropcolor) {
-              const int trigLength = 10;
-              digitalWrite(usTrigPin,HIGH); delayMicroseconds(trigLength); digitalWrite(usTrigPin,LOW);
-              long duration = pulseIn(usEchoPin,HIGH);
-              float distance = duration*(343/1e6)*0.5; // Units: [m], Speed of sound units: [m/us]
-              if ((0.3 < distance) && (distance < 0.6)) {
-                driveBot(driveIn,1,ENA_left,IN1,IN2);
-                driveBot(driveIn,1,ENA_right,IN3,IN4);                
-              } else if (distance <= 0.3) {
-                nextState = S4;                
-              }
-            }
-            } else {
-              nextState = S5;
+              Serial.print("+++++++++++++++++++++");
+//              actionID = STOP; robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
+//              delay(2000);
+//              driveBot(0,1,ENA_left,IN1,IN2);
+//              driveBot(0,1,ENA_right,IN3,IN4);
+//              driveBot(inchForward,1,ENA_left,IN1,IN2);
+//              driveBot(inchForward,1,ENA_right,IN3,IN4);
+                unsigned long intersectTime = millis();
+                driveIn = 40;
+                while (millis()-intersectTime <= 500) {                  
+                  if((mySensorBar.getPosition() > -25) && (mySensorBar.getPosition() < 25))  {
+                    actionID = GO_FORWARD; 
+                    robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4); 
+                    } else if( mySensorBar.getPosition() <= -25 ) {
+                    actionID = CORRECT_LEFT;
+                    robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);         
+                    } else if( mySensorBar.getPosition() >= 25 ) {
+                    actionID = CORRECT_RIGHT; 
+                    robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
+                    }
+                 }
+                 driveIn = 60;
+                 driveBot(driveIn,-1,ENA_left,IN1,IN2);
+                 driveBot(driveIn,-1,ENA_right,IN3,IN4);
+//            const int trigLength = 10;
+//            digitalWrite(usTrigPin,HIGH); delayMicroseconds(trigLength); digitalWrite(usTrigPin,LOW);
+//            long duration = pulseIn(usEchoPin,HIGH);
+//            float distance = duration*(343/1e6)*0.5; // Units: [m], Speed of sound units: [m/us]
+//            if ((0.3 < distance) && (distance < 0.65)) {          
+//              driveBot(driveIn,-1,ENA_left,IN1,IN2);
+//              driveBot(driveIn,-1,ENA_right,IN3,IN4);
+//            }
+                if(mySensorBar.getDensity() > 5) { 
+                delay(100);
+                intersectCount = 0;
+                nextState = S5;
+                }                 
+//              delay(500);
+//              char detectedColor = getColor(FLcolorsensor);
+//              if (detectedColor == dropcolor) {
+//
+////                  driveBot(inchForward,1,ENA_left,IN1,IN2);
+////                  driveBot(inchForward,1,ENA_right,IN3,IN4);
+////                  nextState = S4;
+////                  const int trigLength = 10;
+////                  digitalWrite(usTrigPin,HIGH); delayMicroseconds(trigLength); digitalWrite(usTrigPin,LOW);
+////                  long duration = pulseIn(usEchoPin,HIGH);
+////                  float distance = duration*(343/1e6)*0.5; // Units: [m], Speed of sound units: [m/us]
+////                  Serial.print("Ultrasonic Reading"); Serial.println(distance);
+////                  if ((0.3 < distance) && (distance < 0.6)) {
+////                    driveBot(driveIn,1,ENA_left,IN1,IN2);
+////                    driveBot(driveIn,1,ENA_right,IN3,IN4);                
+////                  } else if (distance <= 0.3) {
+////                    nextState = S4;                
+////                  }
+//              } else {
+//                nextState = S5;
+//              }
             }
 //                get color info
 //                if (color = target) {
@@ -348,27 +387,32 @@ void loop() {
 //                drop_confirmed = 0;
 //                nextState = S5;
 //            }
-        if (drop_confirmed == 1) {
-            const int trigLength = 10;
-            digitalWrite(usTrigPin,HIGH); delayMicroseconds(trigLength); digitalWrite(usTrigPin,LOW);
-            long duration = pulseIn(usEchoPin,HIGH);
-            float distance = duration*(343/1e6)*0.5; // Units: [m], Speed of sound units: [m/us]
-            if ((0.3 < distance) && (distance < 0.65)) {          
-              driveBot(driveIn,-1,ENA_left,IN1,IN2);
-              driveBot(driveIn,-1,ENA_right,IN3,IN4);
-            }
-            if(mySensorBar.getDensity() > 5) { 
-            delay(100);
-            drop_confirmed = 0;
-            intersectCount = 0;
-            nextState = S5;
-            }
-        }
+//        if (drop_confirmed == 1) {
+//            driveBot(driveIn,-1,ENA_left,IN1,IN2);
+//            driveBot(driveIn,-1,ENA_right,IN3,IN4);          
+////            const int trigLength = 10;
+////            digitalWrite(usTrigPin,HIGH); delayMicroseconds(trigLength); digitalWrite(usTrigPin,LOW);
+////            long duration = pulseIn(usEchoPin,HIGH);
+////            float distance = duration*(343/1e6)*0.5; // Units: [m], Speed of sound units: [m/us]
+////            if ((0.3 < distance) && (distance < 0.65)) {          
+////              driveBot(driveIn,-1,ENA_left,IN1,IN2);
+////              driveBot(driveIn,-1,ENA_right,IN3,IN4);
+////            }
+//            if(mySensorBar.getDensity() > 5) { 
+//            delay(100);
+//            drop_confirmed = 0;
+//            intersectCount = 0;
+//            nextState = S5;
+//            }
+//        }
         break;
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
       case S4:  // Mole whacker dropping
         Serial.println("Simulated Mole Whacker Drop");
+        delay(2000);
+        drop_confirmed = 1;
+        nextState = S3;
 //        Serial.println("In S4: Robot deploying mole whacker while Driving, awaiting mole whacker drop confirmation");
 //        if (transition4 == 1) {
 //          if (serial_input == 'M') {
@@ -452,10 +496,11 @@ void loop() {
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void robotDrivingActions(int actionIDs,int ENA_left,int IN1,int IN2,int ENA_right,int IN3,int IN4) {
-  float trimIn = 0.2;    // Fraction of trim (between 0 and 1) used in line following
-  int driveIn = 55;     // Motor speed, PWM input
-  int driveDir = 1;     // Motor rotation direction, 1 for forward and -1 for backward
-  float correctIn = 0.3;  // Fraction of motor speed, used in line following
+//float trimIn = 0.5;    // Fraction of trim (between 0 and 1) used in line following
+//int driveIn = 60;     // Motor speed, PWM input
+//float inchForward = 10; // Motor speed for inching 
+//int driveDir = 1;     // Motor rotation direction, 1 for forward and -1 for backward
+//float correctIn = 0.2;  // Fraction of motor speed, used in line following
   switch (actionIDs) {
     case STOP:
       driveBot(0,0,ENA_left,IN1,IN2);
@@ -466,27 +511,56 @@ void robotDrivingActions(int actionIDs,int ENA_left,int IN1,int IN2,int ENA_righ
     case TURN_LEFT:
       driveBot(driveIn,1,ENA_left,IN1,IN2);
       driveBot((driveIn-driveIn)+5,-1,ENA_right,IN3,IN4);
-//      delay(1000);
-      delay(1250);
+      delay(300);
+//      while(mySensorBar.getPosition() < -25 && mySensorBar.getPosition() !=0){
+      while(mySensorBar.getDensity() != 2) {
+        driveBot(driveIn,1,ENA_left,IN1,IN2);
+        driveBot((driveIn-driveIn)+5,-1,ENA_right,IN3,IN4);
+      }
+//      while(mySensorBar.getPosition() != 0) {
+//        driveBot(driveIn,1,ENA_left,IN1,IN2);
+//        driveBot((driveIn-driveIn)+5,-1,ENA_right,IN3,IN4);
+//      }
+      delay(250);
+//      driveBot(driveIn,1,ENA_left,IN1,IN2);
+//      driveBot((driveIn-driveIn)+5,-1,ENA_right,IN3,IN4);
+////      delay(1000);
+//      delay(1250);
       break;
     case TURN_RIGHT:
       driveBot((driveIn-driveIn)+5,-1,ENA_left,IN1,IN2);
       driveBot(driveIn,1,ENA_right,IN3,IN4);
-//      delay(1000);
-      delay(1250);
+      delay(300);
+//      while(mySensorBar.getPosition() < -25 && mySensorBar.getPosition() !=0){
+      while(mySensorBar.getDensity() != 2) {
+        driveBot((driveIn-driveIn)+5,-1,ENA_left,IN1,IN2);
+        driveBot(driveIn,1,ENA_right,IN3,IN4);
+      }
+      delay(250);      
+//      while(mySensorBar.getPosition() != 0) {
+//        driveBot(driveIn,1,ENA_left,IN1,IN2);
+//        driveBot((driveIn-driveIn)+5,-1,ENA_right,IN3,IN4);
+//      }
+//      driveBot((driveIn-driveIn)+5,-1,ENA_left,IN1,IN2);
+//      driveBot(driveIn,1,ENA_right,IN3,IN4);
+////      delay(1000);
+//      delay(1250);
       break;
     case GO_FORWARD:
       driveBot(driveIn,1,ENA_left,IN1,IN2);
       driveBot(driveIn,1,ENA_right,IN3,IN4);
       break;
     case CORRECT_LEFT:
-      turnBot(correctIn,trimIn,ENA_left,IN1,IN2);
-      turnBot(correctIn,(trimIn-trimIn),ENA_right,IN3,IN4);
+      Serial.println("Correcting Left");
+      turnBot(-1*driveIn,trimIn,ENA_left,IN1,IN2);
+      turnBot(driveIn,(trimIn-trimIn),ENA_right,IN3,IN4);
+//      delay(100);
       break;
     case CORRECT_RIGHT:
       Serial.println("Correcting Right");
-      turnBot(correctIn,(trimIn-trimIn),ENA_left,IN1,IN2);
-      turnBot(correctIn,trimIn,ENA_right,IN3,IN4);    
+      turnBot(driveIn,(trimIn-trimIn),ENA_left,IN1,IN2);
+      turnBot(-1*driveIn,trimIn,ENA_right,IN3,IN4);    
+//      delay(100);
       break;   
   }
 }
@@ -505,14 +579,14 @@ void driveBot(int driveInput,int driveDir,int pinEN,int pinIN_1,int pinIN_2) {
   } 
 }
 
-void turnBot(float turnInput,float trimInput,int pinEN,int pinIN_1,int pinIN_2) {
+void turnBot(float driveIn,float trimInput,int pinEN,int pinIN_1,int pinIN_2) {
   int driveOut;
-  if(turnInput > 0 ) {
-    driveOut = 255*(turnInput);
-  } else {
-    driveOut = 255*((-1*turnInput) + trimInput);
-  }
-  //Serial.println(driveOut);
+//  if(turnInput > 0 ) {
+    driveOut = driveIn*(1+trimInput);
+//  } else {
+//    driveOut = driveIn*(1+ trimInput);
+//  }
+  Serial.println(driveOut);
   analogWrite(pinEN,driveOut);
   digitalWrite(pinIN_1, HIGH);
   digitalWrite(pinIN_2, LOW);
@@ -585,5 +659,4 @@ void checkDrop(int COI) { //accepts color of interest
     if(newsquareL == 0 && millis()-lastleftdrop >= servotime){
     leftservo.write(zero);
     }
-
 }
