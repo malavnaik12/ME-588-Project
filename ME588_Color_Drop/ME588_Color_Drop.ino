@@ -28,8 +28,8 @@ SFE_ISL29125 RGB_sensor_1;
 
 int FRcolorsensor = 0; //front right color sensor scl and sda lines on multiplexer
 int BRcolorsensor = 1; //back right color sensor scl and sda lines on multiplexer
-int FLcolorsensor = 5; //front left color sensor scl and sda lines on multiplexer
-int BLcolorsensor = 6; //back left color sensor scl and sda lines on multiplexer
+//int FLcolorsensor = 5; //front left color sensor scl and sda lines on multiplexer
+//int BLcolorsensor = 6; //back left color sensor scl and sda lines on multiplexer
 
 //TUNING VALUES
 unsigned int redlow = 0; unsigned int redhigh = 5000000000;
@@ -47,7 +47,7 @@ int numLEDs = 8;
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void setup() {
   // Initialize serial communication
-  Serial.begin(9800);
+  Serial.begin(9600);
 
   // Initialize the ISL29125 with simple configuration so it starts sampling
   if (RGB_sensor_1.init())  {
@@ -78,10 +78,7 @@ void setup() {
   rightservo.attach(servoR);
   leftservo.write(zero);
   rightservo.write(zero);
-
-  
-    delay(50);
-    
+  delay(50);  
 }
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -89,6 +86,37 @@ void setup() {
 void loop() {
   checkDrop(dropcolor);
   delay(5);
+}
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void checkDrop(int COI) { //accepts color of interest
+
+    char FR_RGB = getColor(FRcolorsensor);
+    char BR_RGB = getColor(BRcolorsensor);
+//    char FL_RGB = getColor(FLcolorsensor);
+//    char BL_RGB = getColor(BLcolorsensor);
+
+    if(FR_RGB == BR_RGB && FR_RGB == COI && newsquareR == 1){
+    Serial.println("Drop Right");
+    rightservo.write(angle);
+    lastrightdrop = millis();
+    newsquareR = 0;
+    }
+    
+//    if(FL_RGB == BL_RGB && FL_RGB == COI && newsquareL == 1){
+//      Serial.println("Drop Left");
+//      leftservo.write(angle);
+//      lastleftdrop = millis();
+//      newsquareL = 0;
+//    }
+//    
+    if(newsquareR == 0 && millis()-lastrightdrop >= servotime){
+    rightservo.write(zero);
+    }
+    
+    if(newsquareL == 0 && millis()-lastleftdrop >= servotime){
+    leftservo.write(zero);
+    }
+
 }
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -139,35 +167,4 @@ int getColor(int CS_sel) {
 
     delay(20);
     return(color);
-}
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void checkDrop(int COI) { //accepts color of interest
-
-    char FR_RGB = getColor(FRcolorsensor);
-    char BR_RGB = getColor(BRcolorsensor);
-    char FL_RGB = getColor(FLcolorsensor);
-    char BL_RGB = getColor(BLcolorsensor);
-
-    if(FR_RGB == BR_RGB && FR_RGB == COI && newsquareR == 1){
-    Serial.println("Drop Right");
-    rightservo.write(angle);
-    lastrightdrop = millis();
-    newsquareR = 0;
-    }
-    
-    if(FL_RGB == BL_RGB && FL_RGB == COI && newsquareL == 1){
-      Serial.println("Drop Left");
-      leftservo.write(angle);
-      lastleftdrop = millis();
-      newsquareL = 0;
-    }
-    
-    if(newsquareR == 0 && millis()-lastrightdrop >= servotime){
-    rightservo.write(zero);
-    }
-    
-    if(newsquareL == 0 && millis()-lastleftdrop >= servotime){
-    leftservo.write(zero);
-    }
-
 }

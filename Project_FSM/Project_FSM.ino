@@ -1,11 +1,12 @@
-// Project_FSM.ino - Modified by Malav Naik on Mar 22, 2022
-// modified by Harsh Pathak on April 17, 18, 19 2022
-// States 0 and 1 complete
-
 // Library definitions
 #include "Encoder.h"
 #include "Wire.h"
 #include "sensorbar.h"
+#include "Servo.h"
+#include "SPI.h"
+#include "SFE_ISL29125.h"
+
+#define TCAADDR 0x70
 
 // State names definitions, and associated integer values
 int state = 0;
@@ -45,10 +46,12 @@ float startTime = 0;        // Variable used to denote the beginning of the game
 float currentTime = 0;      // Time variable
 int timeLimit = 0;          // Characterizes if the 2-minute time limit is exceeded
 int targetColor = 0;        // Integer characterizes the target color: 1 = red, 2 = yellow, 3 = blue
+int drop_confirmed = 0; 
 
 // Motor inputs
 //float trimIn = 0.5;    // Fraction of trim (between 0 and 1) used in line following
-int driveIn = 50;     // Motor speed, PWM input
+int driveIn = 55;     // Motor speed, PWM input
+float inchForward = 10; // Motor speed for inching 
 int driveDir = 1;     // Motor rotation direction, 1 for forward and -1 for backward
 //float correctIn = 0.3;  // Fraction of motor speed, used in line following
 
@@ -56,18 +59,31 @@ int driveDir = 1;     // Motor rotation direction, 1 for forward and -1 for back
   // Ultrasonic Sensor
 unsigned long usPreviousTime = 0;
 const int usReadDelay = 1000;
-const int usEchoPin = 2;
-const int usTrigPin = 3;
+const int usEchoPin = 30;
+const int usTrigPin = 6;
   // Motors
-int ENA_left = 2; int IN1 = 3; int IN2 = 4;
+int ENA_left = 2; 
+int IN1 = 3; 
+int IN2 = 4;
 //int encA_left = 5;
 //int encB_left = 6;
-int ENA_right = 7; int IN3 = 8; int IN4 = 9;
+int ENA_right = 7; 
+int IN3 = 8; 
+int IN4 = 9;
 //int encA_right = 10; 
 //int encB_right = 11;
   // Encoder positions for both motors
-int encPos_left = 0; int encPos_right = 0;
-
+int encPos_left = 0; 
+int encPos_right = 0;
+  // Color Sensors
+int FRcolorsensor = 2; //front right color sensor scl and sda lines on multiplexer
+int BRcolorsensor = 3; //back right color sensor scl and sda lines on multiplexer
+int FLcolorsensor = 4; //front left color sensor scl and sda lines on multiplexer
+int BLcolorsensor = 5; //back left color sensor scl and sda lines on multiplexer
+  // Dropping Servo
+#include <Servo.h>
+Servo leftservo;
+Servo rightservo;
 // Object definitions
   // Encoders
 //Encoder leftEncoder(encA_left, encB_left);
@@ -75,6 +91,31 @@ int encPos_left = 0; int encPos_right = 0;
   // Line array
 const uint8_t SX1509_ADDRESS = 0x3E;  // SX1509 I2C address (00), for Line Sensor Array
 SensorBar mySensorBar(SX1509_ADDRESS);
+  // Declare color sensor object
+SFE_ISL29125 RGB_sensor_1;
+
+// Color Sensor Related Initializations
+// TUNING VALUES
+unsigned int redlow = 0; unsigned int redhigh = 5000000000;
+unsigned int greenlow = 0; unsigned int greenhigh = 5000000000;
+unsigned int bluelow = 0; unsigned int bluehigh = 5000000000;
+// COLOR TUNING FOR WITHOUT WHITE LED
+float redtune = .40; //proportion of total color values returned that must be red for a color to be considered red
+float bluegreentune = .75; //proportion of green + blue needed to be considered blue
+float redgreentune = .75; //proportion of green + red needed to be considered yellow
+//COLOR TO DROP ON
+char dropcolor = 'R'; //can be R, Y, or B
+
+// Servo Related Initializations
+const int servoL = 11;
+const int servoR = 12;
+const int servotime = 400;
+const int zero = 0;
+const int angle = 90;
+unsigned long lastrightdrop = 0; //time of last drop on right
+unsigned long lastleftdrop = 0; //time of last drop on left
+int newsquareR = 1; //1 if in a square that hasn't been dropped yet
+int newsquareL = 1;
 
 // Robot action IDs
 int actionID;
@@ -86,33 +127,65 @@ const int CORRECT_RIGHT = 4;
 const int TURN_LEFT = 5;
 const int TURN_RIGHT = 6;
 const int STOP = 7;
-char serial_input = ' ';
 
 void setup() {
   // Defining output pins
-  Serial.begin(9600);
-  pinMode(usTrigPin,OUTPUT);
-  pinMode(usEchoPin,INPUT);
-  pinMode(col_button1, INPUT_PULLUP);
-  pinMode(col_button2, INPUT_PULLUP);
-  pinMode(col_button3, INPUT_PULLUP);
-  pinMode(start_button, INPUT_PULLUP);
-  pinMode(redpin, OUTPUT);
-  pinMode(bluepin, OUTPUT);
-  pinMode(yellowpin, OUTPUT);
+  Serial.begin(115200);
+  pinMode(usTrigPin,OUTPUT); pinMode(usEchoPin,INPUT);
+  pinMode(col_button1, INPUT_PULLUP); pinMode(col_button2, INPUT_PULLUP);
+  pinMode(col_button3, INPUT_PULLUP); pinMode(start_button, INPUT_PULLUP);
+  pinMode(redpin, OUTPUT); pinMode(bluepin, OUTPUT); pinMode(yellowpin, OUTPUT);
   pinMode(startpin, OUTPUT);
   
-  pinMode(IN1, OUTPUT);
-  pinMode(IN2, OUTPUT);
-  pinMode(ENA_left, OUTPUT);
-  pinMode(IN3, OUTPUT);
-  pinMode(IN4, OUTPUT);
-  pinMode(ENA_right, OUTPUT);
+  pinMode(IN1, OUTPUT); pinMode(IN2, OUTPUT); pinMode(ENA_left, OUTPUT);
+  pinMode(IN3, OUTPUT); pinMode(IN4, OUTPUT); pinMode(ENA_right, OUTPUT);
 
   mySensorBar.setBarStrobe();     //Default: the IR will only be turned on during reads.
   mySensorBar.clearInvertBits();  //Default: dark on light
-  mySensorBar.begin();  
+  mySensorBar.begin();
+
+  while (!Serial);
+    delay(1000);
+    Wire.begin();
+    Serial.println("\nTCAScanner ready!");
+    
+    for (uint8_t t=0; t<8; t++) {
+      tcaselect(t);
+      Serial.print("TCA Port #"); Serial.println(t);
+      for (uint8_t addr = 0; addr<=127; addr++) {
+        if (addr == TCAADDR) continue;
+        Wire.beginTransmission(addr);
+        if (!Wire.endTransmission()) {
+          Serial.print("Found I2C 0x");  Serial.println(addr,HEX);
+        }
+      }
+    }  
+  tcaselect(FRcolorsensor);
+  if (RGB_sensor_1.init())  {
+    Serial.println("Sensor @ Pin 2 Initialization Successful\n\r");
+  }    
+  tcaselect(BRcolorsensor);
+  if (RGB_sensor_1.init())  {
+    Serial.println("Sensor @ Pin 3 Initialization Successful\n\r");
   }
+  tcaselect(FLcolorsensor);
+  if (RGB_sensor_1.init())  {
+    Serial.println("Sensor @ Pin 4 Initialization Successful\n\r");
+  }    
+  tcaselect(BLcolorsensor);
+  if (RGB_sensor_1.init())  {
+    Serial.println("Sensor @ Pin 5 Initialization Successful\n\r");
+  }
+  leftservo.attach(servoL);
+  rightservo.attach(servoR);
+  leftservo.write(zero);
+  rightservo.write(zero);
+//      delay(3000);
+//      getColor(0);
+//      delay(3000);
+//      getColor(1);  
+  Serial.println("\ndone");
+}
 
 void loop() {
   if (timeLimit == 0) {
@@ -135,8 +208,7 @@ void loop() {
     game_mode = !digitalRead(start_button);
 //    Serial.print("red_color"); Serial.println(red_color); 
 //    Serial.print("game_mode"); Serial.println(game_mode);
-//    Serial.print("state "); Serial.println(state);
-    Serial.print("game state"); Serial.println(game_state);
+//    Serial.print("game state"); Serial.println(game_state);
     Serial.print("state"); Serial.println(state);
 //    Serial.print(actionID);
     // Read motor encoder postions
@@ -154,17 +226,17 @@ void loop() {
             digitalWrite(redpin, HIGH); // lighting up the red led as a visual indicator 
             nextState = S1; // transitioning into state S1
             color_state == HIGH; // setting the new color state to High
-            targetColor = 1;
+            dropcolor = 'R';
         } else if (yellow_color == HIGH && (red_color == LOW && blue_color == LOW) && color_state == LOW){ // condition for selecting the yellow color and lighting up the yellow led
             digitalWrite(yellowpin, HIGH); // lighting up the yellow led as a visual indicator 
             nextState = S1; // transitioning into state S1
             color_state == HIGH; // setting the new color state to High
-            targetColor = 2;
+            dropcolor = 'Y';
         } else if (blue_color == HIGH && (yellow_color == LOW && red_color == LOW) && color_state == LOW){ // condition for selecting the blue color and lighting up the blue led
             digitalWrite(bluepin, HIGH); // lighting up the blue led as a visual indicator 
             nextState = S1; // transitioning into state S1
             color_state == HIGH; // setting the new color state to High
-            targetColor = 3;            
+            dropcolor = 'B';            
         }
         break;
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -195,7 +267,7 @@ void loop() {
           lineFound = 1;
           actionID = STOP; 
           robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
-          actionID = TURN_RIGHT; 
+          actionID = TURN_LEFT; 
           robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
           nextState = S3;
         }
@@ -207,8 +279,6 @@ void loop() {
           Serial.println("In S3: Robot Driving Home, waiting for color sensor to detect white square");
           nextState = S6;
         } 
-//        Serial.print("In S3: Robot Driving, awaiting Input for target color from Color Sensor - ");
-//        Serial.print("Mole Whackers Left: "); Serial.println(5-drop_count);
         Serial.println(mySensorBar.getPosition());
         if((mySensorBar.getPosition() > -25) && (mySensorBar.getPosition() < 25))  {
           actionID = GO_FORWARD; 
@@ -226,11 +296,30 @@ void loop() {
           nextState = S3;
         }
         if(mySensorBar.getDensity() > 5) { 
-          intersectCount++;
+          delay(400);
+          intersectCount++;         
           if (intersectCount == 3) {
             actionID = STOP; robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
+//            nextState = S5;
 //                [INSERT CODE BELOW]: Corner checking
-//                drive slightly forward
+            driveBot(inchForward,1,ENA_left,IN1,IN2);
+            driveBot(inchForward,1,ENA_right,IN3,IN4);
+            char detectedColor = getColor(FLcolorsensor);
+            if (detectedColor == dropcolor) {
+              const int trigLength = 10;
+              digitalWrite(usTrigPin,HIGH); delayMicroseconds(trigLength); digitalWrite(usTrigPin,LOW);
+              long duration = pulseIn(usEchoPin,HIGH);
+              float distance = duration*(343/1e6)*0.5; // Units: [m], Speed of sound units: [m/us]
+              if ((0.3 < distance) && (distance < 0.6)) {
+                driveBot(driveIn,1,ENA_left,IN1,IN2);
+                driveBot(driveIn,1,ENA_right,IN3,IN4);                
+              } else if (distance <= 0.3) {
+                nextState = S4;                
+              }
+            }
+            } else {
+              nextState = S5;
+            }
 //                get color info
 //                if (color = target) {
 //                  nextState = S4;
@@ -240,7 +329,6 @@ void loop() {
           } else {
             nextState = S3; 
           }
-        }
 //            unsigned long usCurrentTime = millis();  
 //            if (usCurrentTime - usPreviousTime >= usReadDelay) {
 //              const int trigLength = 10;  
@@ -259,7 +347,23 @@ void loop() {
 //            if (drop_confirmed == 1) {
 //                drop_confirmed = 0;
 //                nextState = S5;
-//            }        
+//            }
+        if (drop_confirmed == 1) {
+            const int trigLength = 10;
+            digitalWrite(usTrigPin,HIGH); delayMicroseconds(trigLength); digitalWrite(usTrigPin,LOW);
+            long duration = pulseIn(usEchoPin,HIGH);
+            float distance = duration*(343/1e6)*0.5; // Units: [m], Speed of sound units: [m/us]
+            if ((0.3 < distance) && (distance < 0.65)) {          
+              driveBot(driveIn,-1,ENA_left,IN1,IN2);
+              driveBot(driveIn,-1,ENA_right,IN3,IN4);
+            }
+            if(mySensorBar.getDensity() > 5) { 
+            delay(100);
+            drop_confirmed = 0;
+            intersectCount = 0;
+            nextState = S5;
+            }
+        }
         break;
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -302,6 +406,7 @@ void loop() {
             if((mySensorBar.getPosition() > -25) && (mySensorBar.getPosition() < 25))  {
               if(mySensorBar.getDensity() > 5) { 
                   intersectCount++;
+                  delay(350);
                   if (intersectCount == 3) {
                     actionID = STOP; robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
       //            [INSERT CODE BELOW]: Entering white square after objectives achieved
@@ -312,7 +417,7 @@ void loop() {
       //                delay(500);
       //                turn right
       //                timeLimit = 1; 
-      //              } else if (white == leftt_side) {
+      //              } else if (white == left_side) {
       //                drive forward
       //                delay(500);
       //                turn left
@@ -320,7 +425,7 @@ void loop() {
       //              }
       //            }                    
                   } else {
-                    nextState = S3; 
+                    nextState = S6; 
                   }
                 } else {
                   actionID = GO_FORWARD; robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4); 
@@ -347,26 +452,28 @@ void loop() {
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void robotDrivingActions(int actionIDs,int ENA_left,int IN1,int IN2,int ENA_right,int IN3,int IN4) {
-//  int trimIn = 0.05;    // Fraction of trim (between 0 and 1) used in line following
-//  int driveIn = 50;     // Motor speed, PWM input
-//  int driveDir = 1;     // Motor rotation direction, 1 for forward and -1 for backward
-//  float correctIn = .2;  // Fraction of motor speed, used in line following
+  float trimIn = 0.2;    // Fraction of trim (between 0 and 1) used in line following
+  int driveIn = 55;     // Motor speed, PWM input
+  int driveDir = 1;     // Motor rotation direction, 1 for forward and -1 for backward
+  float correctIn = 0.3;  // Fraction of motor speed, used in line following
   switch (actionIDs) {
     case STOP:
       driveBot(0,0,ENA_left,IN1,IN2);
       driveBot(0,0,ENA_right,IN3,IN4);
       Serial.println("Executing STOP action");
-      delay(500);
+      delay(250);
       break;
     case TURN_LEFT:
       driveBot(driveIn,1,ENA_left,IN1,IN2);
       driveBot((driveIn-driveIn)+5,-1,ENA_right,IN3,IN4);
-      delay(1500);
+//      delay(1000);
+      delay(1250);
       break;
     case TURN_RIGHT:
       driveBot((driveIn-driveIn)+5,-1,ENA_left,IN1,IN2);
       driveBot(driveIn,1,ENA_right,IN3,IN4);
-      delay(1500);
+//      delay(1000);
+      delay(1250);
       break;
     case GO_FORWARD:
       driveBot(driveIn,1,ENA_left,IN1,IN2);
@@ -409,4 +516,74 @@ void turnBot(float turnInput,float trimInput,int pinEN,int pinIN_1,int pinIN_2) 
   analogWrite(pinEN,driveOut);
   digitalWrite(pinIN_1, HIGH);
   digitalWrite(pinIN_2, LOW);
+}
+
+void tcaselect(uint8_t i) {
+  if (i > 7) return;
+  Wire.beginTransmission(TCAADDR);
+  Wire.write(1 << i);
+  Wire.endTransmission();  
+}
+
+int getColor(int CS_sel) {
+    tcaselect(CS_sel);
+    float redIn = RGB_sensor_1.readRed();
+    float greenIn = RGB_sensor_1.readGreen();
+    float blueIn = RGB_sensor_1.readBlue();
+    
+    // Print out readings, change HEX to DEC if you prefer decimal output
+    Serial.print("Color Sensor: "); Serial.println(CS_sel);
+
+    char color = 'W';
+    if((redIn/(redIn+blueIn+greenIn)) >= redtune && redIn != 0){
+      color = 'R';
+       Serial.println("RED");
+        Serial.println((redIn/(redIn+blueIn+greenIn)));
+    }
+
+     else if((blueIn+greenIn)/(redIn+blueIn+greenIn) >= bluegreentune && blueIn != 0){
+      color = 'B';
+      Serial.println("BLUE");
+      Serial.println((blueIn+greenIn)/(redIn+blueIn+greenIn));
+    }
+
+      else if((redIn+greenIn)/(redIn+blueIn+greenIn) >= redgreentune && greenIn != 0){
+      color = 'Y';
+      Serial.println("Yellow");
+      Serial.println((redIn+greenIn)/(redIn+blueIn+greenIn));
+    }  
+
+    delay(20);
+    return(color);
+}
+
+void checkDrop(int COI) { //accepts color of interest
+
+    char FR_RGB = getColor(FRcolorsensor);
+    char BR_RGB = getColor(BRcolorsensor);
+    char FL_RGB = getColor(FLcolorsensor);
+    char BL_RGB = getColor(BLcolorsensor);
+
+    if(FR_RGB == BR_RGB && FR_RGB == COI && newsquareR == 1){
+    Serial.println("Drop Right");
+    rightservo.write(angle);
+    lastrightdrop = millis();
+    newsquareR = 0;
+    }
+    
+    if(FL_RGB == BL_RGB && FL_RGB == COI && newsquareL == 1){
+      Serial.println("Drop Left");
+      leftservo.write(angle);
+      lastleftdrop = millis();
+      newsquareL = 0;
+    }
+    
+    if(newsquareR == 0 && millis()-lastrightdrop >= servotime){
+    rightservo.write(zero);
+    }
+    
+    if(newsquareL == 0 && millis()-lastleftdrop >= servotime){
+    leftservo.write(zero);
+    }
+
 }
