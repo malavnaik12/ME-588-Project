@@ -47,6 +47,7 @@ float currentTime = 0;      // Time variable
 int timeLimit = 0;          // Characterizes if the 2-minute time limit is exceeded
 int targetColor = 0;        // Integer characterizes the target color: 1 = red, 2 = yellow, 3 = blue
 int drop_confirmed = 0; 
+int rightTurns = 0;
 
 // Motor inputs
 float trimIn = 0.8;    // Fraction of trim (between 0 and 1) used in line following
@@ -104,7 +105,7 @@ float redtune = .40; //proportion of total color values returned that must be re
 float bluegreentune = .75; //proportion of green + blue needed to be considered blue
 float redgreentune = .75; //proportion of green + red needed to be considered yellow
 //COLOR TO DROP ON
-char dropcolor = 'R'; //can be R, Y, or B
+char dropcolor = 'W'; //can be R, Y, or B
 
 // Servo Related Initializations
 const int servoL = 11;
@@ -114,8 +115,8 @@ const int zero = 0;
 const int angle = 90;
 unsigned long lastrightdrop = 0; //time of last drop on right
 unsigned long lastleftdrop = 0; //time of last drop on left
-int newsquareR = 1; //1 if in a square that hasn't been dropped yet
-int newsquareL = 1;
+int newsquareR = 0; //1 if in a square that hasn't been dropped yet
+int newsquareL = 0;
 
 // Robot action IDs
 int actionID;
@@ -217,7 +218,8 @@ void loop() {
     //  Serial.print("Left Encoder Position: "); Serial.println(encPos_left);
     //  Serial.print("Right Encoder Position: "); Serial.println(encPos_right);
     
-      
+//    checkDrop(dropcolor);
+    
     // 2. Robot FSM
     switch(state) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -269,6 +271,8 @@ void loop() {
           robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
           actionID = TURN_LEFT; 
           robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
+          newsquareR = 1; //1 if in a square that hasn't been dropped yet
+          newsquareL = 1; 
           nextState = S3;
         }
         break;
@@ -297,7 +301,12 @@ void loop() {
         }
         if(mySensorBar.getDensity() > 5) { 
           delay(250);
+          newsquareR = 1; //1 if in a square that hasn't been dropped yet
+          newsquareL = 1;
           intersectCount++;
+//          if (rightTurns == 3) {
+//            newsquareR = 0;
+//          }
           Serial.print("Intersect Count"); Serial.println(intersectCount);
           if (intersectCount == 3) {
               Serial.print("+++++++++++++++++++++");
@@ -388,26 +397,28 @@ void loop() {
 //                drop_confirmed = 0;
 //                nextState = S5;
 //            }
-        if (drop_confirmed == 1) {
+          if (drop_confirmed == 1) {
             driveBot(driveIn,-1,ENA_left,IN1,IN2);
-            driveBot(driveIn,-1,ENA_right,IN3,IN4);          
-//            const int trigLength = 10;
-//            digitalWrite(usTrigPin,HIGH); delayMicroseconds(trigLength); digitalWrite(usTrigPin,LOW);
-//            long duration = pulseIn(usEchoPin,HIGH);
-//            float distance = duration*(343/1e6)*0.5; // Units: [m], Speed of sound units: [m/us]
-//            if ((0.3 < distance) && (distance < 0.65)) {          
-//              driveBot(driveIn,-1,ENA_left,IN1,IN2);
-//              driveBot(driveIn,-1,ENA_right,IN3,IN4);
-//            }
-            if(mySensorBar.getDensity() > 5) { 
-//            delay(100);
-              drop_confirmed = 0;
-              intersectCount = 0;
+            driveBot(driveIn,-1,ENA_right,IN3,IN4);
+            newsquareR = 0; //1 if in a square that hasn't been dropped yet
+            newsquareL = 0;
+           while (mySensorBar.getDensity() < 5) {
+              delay(10);          
+//            if (mySensorBar.getDensity() > 5) { 
+//              drop_confirmed = 0;
+//              intersectCount = 0;
 //              actionID = STOP; robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
-              actionID = TURN_RIGHT; robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
-              nextState = S3;
+//              actionID = TURN_RIGHT; robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
+//              nextState = S3;
             }
-        }
+//            delay(250);
+//            actionID = GO_FORWARD; robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
+            delay(25);
+            actionID = TURN_RIGHT; robotDrivingActions(actionID,ENA_left,IN1,IN2,ENA_right,IN3,IN4);
+//            rightTurns++;
+            drop_confirmed = 0;
+            intersectCount = 1;  
+            }
         break;
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -531,11 +542,11 @@ void robotDrivingActions(int actionIDs,int ENA_left,int IN1,int IN2,int ENA_righ
 //      delay(1250);
       break;
     case TURN_RIGHT:
-      driveBot((driveIn-driveIn)+5,-1,ENA_left,IN1,IN2);
+      driveBot((driveIn-driveIn)+40,1,ENA_left,IN1,IN2);
       driveBot(driveIn,1,ENA_right,IN3,IN4);
-      delay(300);
+      delay(1000);
       while(mySensorBar.getDensity() != 2) {
-        driveBot((driveIn-driveIn)+5,-1,ENA_left,IN1,IN2);
+        driveBot((driveIn-driveIn)+40,1,ENA_left,IN1,IN2);
         driveBot(driveIn,1,ENA_right,IN3,IN4);
       }
       delay(250);
